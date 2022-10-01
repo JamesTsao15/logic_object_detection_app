@@ -3,22 +3,28 @@ package com.example.logic_object_detection
 import android.graphics.*
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.provider.Telephony
 import android.util.Log
 import android.view.*
-import androidx.annotation.ColorRes
 import com.example.logic_object_detection.databinding.ActivityCameraBinding
 import org.opencv.android.*
 import org.opencv.core.*
+import org.opencv.core.Point
+import org.opencv.imgproc.Imgproc
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
+import java.util.Vector
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
 
 class CameraActivity : AppCompatActivity(),CameraBridgeViewBase.CvCameraViewListener2 {
     private lateinit var mRgba:Mat
     private lateinit var mGray:Mat
+    private lateinit var mYuv:Mat
     private lateinit var objectDetectionCameraView:CameraBridgeViewBase
     private lateinit var binding:ActivityCameraBinding
+    private lateinit var lineArrayList:ArrayList<Line>
     private val myLoaderCallback:BaseLoaderCallback=object :BaseLoaderCallback(this){
         override fun onManagerConnected(status: Int) {
             when(status){
@@ -38,6 +44,7 @@ class CameraActivity : AppCompatActivity(),CameraBridgeViewBase.CvCameraViewList
         binding=ActivityCameraBinding.inflate(layoutInflater)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(binding.root)
+        lineArrayList= ArrayList()
         val actionBar=supportActionBar
         if (actionBar != null) {
             actionBar.hide()
@@ -88,8 +95,10 @@ class CameraActivity : AppCompatActivity(),CameraBridgeViewBase.CvCameraViewList
             Utils.matToBitmap(mRgba,myBitmap)
             val mat=Mat()
             if (myBitmap != null) {
+                detectHoughLinesP()
                 val objectDetectBitmap=runObjectDetection(myBitmap)
-                Utils.bitmapToMat(objectDetectBitmap,mat)
+                val lineDetectBitmap=drawLineDetection(objectDetectBitmap)
+                Utils.bitmapToMat(lineDetectBitmap,mat)
             }
             return mat
         }
@@ -108,16 +117,17 @@ class CameraActivity : AppCompatActivity(),CameraBridgeViewBase.CvCameraViewList
             options
         )
         val results = detector.detect(image)
-        debugPrint(results)
-        val drawingBitmap=drawDetection(bitmap,results)
+//        debugPrint(results)
+        val drawingBitmap=drawObjectDetection(bitmap,results)
         return drawingBitmap
     }
 
-    private fun drawDetection(bitmap:Bitmap,results: List<Detection>):Bitmap {
+    private fun drawObjectDetection(bitmap:Bitmap,results: List<Detection>):Bitmap {
+
         val tempBitmap=bitmap.copy(Bitmap.Config.ARGB_8888,true)
+        val canvas=Canvas(tempBitmap)
         for ((i, obj) in results.withIndex()) {
             val box=obj.boundingBox
-            val canvas=Canvas(tempBitmap)
             val paint=Paint()
             paint.setColor(Color.RED)
             paint.style=Paint.Style.STROKE
@@ -131,9 +141,48 @@ class CameraActivity : AppCompatActivity(),CameraBridgeViewBase.CvCameraViewList
                 canvas.drawText(category.label,box.left+50,box.top-50,textPaint)
             }
         }
+
         return tempBitmap
     }
 
+    private fun detectHoughLinesP(){
+        val ret:Mat=Mat()
+        val mEdge:Mat=Mat()
+        val lines:Mat=Mat()
+        Imgproc.adaptiveThreshold(mGray,ret,255.0,Imgproc.ADAPTIVE_THRESH_MEAN_C,
+            Imgproc.THRESH_BINARY_INV,55,10.0)
+        ret.convertTo(mEdge,CvType.CV_8UC1)
+        Imgproc.HoughLinesP(mEdge,lines,1.0,Math.PI/180.0,100,100.0,10.0)
+        val out = Mat.zeros(mGray.size(), mGray.type())
+        for (i in 0 until lines.rows()) {
+            val data = IntArray(4)
+            lines.get(i, 0, data)
+            val pt1 = Point(data[0].toDouble(), data[1].toDouble())
+            val pt2 = Point(data[2].toDouble(), data[3].toDouble())
+            Imgproc.line(out, pt1, pt2, Scalar(255.0, 255.0, 255.0), 2, Imgproc.LINE_AA, 0)
+            lineArrayList.add(Line(pt1,pt2))
+        }
+    }
+
+    private fun drawLineDetection(bitmap: Bitmap):Bitmap{
+        val tempBitmap=bitmap.copy(Bitmap.Config.ARGB_8888,true)
+        val canvas=Canvas(tempBitmap)
+        val paint=Paint().apply {
+            color=Color.BLUE
+            strokeWidth=10f
+        }
+        for(i in 0 until lineArrayList.size){
+            val startPoint=lineArrayList[i].startPoint
+            val endPoint=lineArrayList[i].endPoint
+            canvas.drawLine(startPoint.x.toFloat(),
+                startPoint.y.toFloat(),
+                endPoint.x.toFloat(),
+                endPoint.y.toFloat(),paint)
+        }
+        lineArrayList.clear()
+
+        return tempBitmap
+    }
 
     private fun debugPrint(results : List<Detection>) {
         for ((i, obj) in results.withIndex()) {

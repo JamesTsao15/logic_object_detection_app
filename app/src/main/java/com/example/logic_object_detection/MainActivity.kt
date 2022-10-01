@@ -5,12 +5,13 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var getImage:ActivityResultLauncher<String>
     @RequiresApi(Build.VERSION_CODES.M)
     private val CAMERA_ACTION_CODE=100
+    private lateinit var uri: Uri
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         activityMainBinding=ActivityMainBinding.inflate(layoutInflater)
@@ -34,8 +36,16 @@ class MainActivity : AppCompatActivity() {
         getImage=registerForActivityResult(ActivityResultContracts.GetContent(),
         ActivityResultCallback{
             activityMainBinding.imgViewShowPhoto.setImageURI(it)
-            activityMainBinding.btnNextStep.visibility= View.VISIBLE
+            try{
+                uri=it
+                activityMainBinding.btnNextStep.visibility= View.VISIBLE
+            }catch (e:java.lang.NullPointerException){
+                e.stackTrace
+                Toast.makeText(this,"獲取圖片失敗",Toast.LENGTH_SHORT).show()
+            }
+
         })
+
     }
 
     override fun onResume() {
@@ -49,6 +59,12 @@ class MainActivity : AppCompatActivity() {
         activityMainBinding.btnPickPhoto.setOnClickListener {
             getImage.launch("image/*")
         }
+        activityMainBinding.btnNextStep.setOnClickListener {
+            val intent=Intent(this,detect_logic_picture_Activity::class.java)
+            intent.putExtra("picture_uri",uri.toString())
+            startActivity(intent)
+        }
+
     }
     private fun checkCameraPermission(activity:Activity):Boolean {
         val cameraPermissionCheck:Int = ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA);
