@@ -152,7 +152,7 @@ class CameraActivity : AppCompatActivity(),CameraBridgeViewBase.CvCameraViewList
         Imgproc.adaptiveThreshold(mGray,ret,255.0,Imgproc.ADAPTIVE_THRESH_MEAN_C,
             Imgproc.THRESH_BINARY_INV,55,10.0)
         ret.convertTo(mEdge,CvType.CV_8UC1)
-        Imgproc.HoughLinesP(mEdge,lines,1.0,Math.PI/180.0,100,100.0,10.0)
+        Imgproc.HoughLinesP(mEdge,lines,1.0,Math.PI/180.0,100,100.0,0.0)
         val out = Mat.zeros(mGray.size(), mGray.type())
         for (i in 0 until lines.rows()) {
             val data = IntArray(4)
