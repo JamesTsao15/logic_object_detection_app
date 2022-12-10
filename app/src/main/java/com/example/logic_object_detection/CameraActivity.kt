@@ -97,8 +97,8 @@ class CameraActivity : AppCompatActivity(),CameraBridgeViewBase.CvCameraViewList
             if (myBitmap != null) {
                 detectHoughLinesP()
                 val objectDetectBitmap=runObjectDetection(myBitmap)
-                val lineDetectBitmap=drawLineDetection(objectDetectBitmap)
-                Utils.bitmapToMat(lineDetectBitmap,mat)
+                //val lineDetectBitmap=drawLineDetection(objectDetectBitmap)
+                Utils.bitmapToMat(objectDetectBitmap,mat)
             }
             return mat
         }

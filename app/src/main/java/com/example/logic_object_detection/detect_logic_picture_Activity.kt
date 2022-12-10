@@ -1,12 +1,17 @@
 package com.example.logic_object_detection
 
 
+import android.annotation.SuppressLint
 import android.app.ProgressDialog
 import android.graphics.*
 import android.net.Uri
-import android.os.*
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Message
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.example.logic_object_detection.databinding.ActivityDetectLogicPictureBinding
@@ -14,22 +19,19 @@ import org.opencv.android.BaseLoaderCallback
 import org.opencv.android.LoaderCallbackInterface
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
-import org.opencv.core.CvType
-import org.opencv.core.Mat
+import org.opencv.core.*
 import org.opencv.core.Point
-import org.opencv.core.Scalar
-import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
-import java.util.concurrent.atomic.AtomicLongArray
 
 
 class detect_logic_picture_Activity : AppCompatActivity() {
     private lateinit var binding: ActivityDetectLogicPictureBinding
-    private lateinit var thread_decodeBitmap:Thread
+    private lateinit var thread_detect_Circuit:Thread
     private lateinit var detectBitmap:Bitmap
+    private lateinit var detectionBitmap:Bitmap
     private lateinit var lineArrayList: ArrayList<Line>
     private lateinit var mergeLineArrayList: ArrayList<Line>
     private lateinit var LongMergeLineArrayList: ArrayList<Line>
@@ -43,7 +45,6 @@ class detect_logic_picture_Activity : AppCompatActivity() {
             when(status){
                 LoaderCallbackInterface.SUCCESS->{
                     Log.e("JAMES","Opencv is loaded")
-                    sendMessage(2)
                 }
                 else->{
                     super.onManagerConnected(status)
@@ -51,42 +52,20 @@ class detect_logic_picture_Activity : AppCompatActivity() {
             }
         }
     }
-    private val mHandler:Handler=object : Handler() {
+    private val mHandler:Handler= @SuppressLint("HandlerLeak")
+    object : Handler() {
         override fun handleMessage(msg: Message) {
             when(msg.what){
                 0->{
+                    Log.e("JAMES","in message 0")
                     progressDialog= ProgressDialog(this@detect_logic_picture_Activity).apply {
                         setMessage("轉化電路中......")
                     }
                     progressDialog.show()
-                    sendMessage(1)
                 }
                 1->{
-                    Log.e("JAMES","dialog show")
-                    if(OpenCVLoader.initDebug()){
-                        Log.e("JAMES","Opencv initialization is done")
-                        myLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS)
-                        thread_decodeBitmap.join()
-                        val objectDetectBitmap=runObjectDetection(detectBitmap.copy(Bitmap.Config.ARGB_8888,true))
-                        val detectMat=bitmapToMat(detectBitmap)
-                        val detectDoneMat=detectHoughLinesP(detectMat)
-                        val detectionBitmap=drawLinedetection(objectDetectBitmap)
-                        binding.imageViewLineDetect.setImageBitmap(detectionBitmap)
-                    }
-                    else{
-                        Log.e("JAMES","Opencv is not loaded. try again")
-                        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION,applicationContext,myLoaderCallback)
-                    }
-                }
-                2->{
-                    Log.e("JAMES","logicResult:"+ObjectDetectResultArrayList.toString())
-                    for(i in 0 until ObjectDetectResultArrayList.size){
-                        checkInput(ObjectDetectResultArrayList[i],LongMergeLineArrayList)
-                    }
-                    sendMessage(3)
-                }
-                3->{
-                    Log.e("JAMES","dialog Dismiss")
+                    Log.e("JAMES","in message 1")
+                    binding.imageViewLineDetect.setImageBitmap(detectionBitmap)
                     try {
                         progressDialog.dismiss()
                     }catch (e:UninitializedPropertyAccessException){
@@ -96,7 +75,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
             }
         }
     }
-
+    private lateinit var NodeArrayList:ArrayList<Node>
     private fun checkInput(logicObject: Logic_Object,lines:ArrayList<Line>) {
         val rangeX=logicObject.box.left
         val rangeTop=logicObject.box.top
@@ -125,10 +104,10 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding= ActivityDetectLogicPictureBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        sendMessage(0)
         title="PhotoToCircuit"
         Log.e("JAMES","detect_onCreate_start")
         ObjectDetectResultArrayList= ArrayList()
+        NodeArrayList= ArrayList()
         lineArrayList= ArrayList()
         mergeLineArrayList= ArrayList()
         LongMergeLineArrayList= ArrayList()
@@ -138,15 +117,66 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         try {
             if (Build.VERSION.SDK_INT < 28) {
                detectBitmap = MediaStore.Images.Media.getBitmap(contentResolver, pictrueUri)
-            } else {
+               detectBitmap=resizeBitmapSize(detectBitmap,700,400)
+                thread_detect_Circuit= Thread(Runnable {
+                        runOnUiThread{
+                            binding.imageViewDetectPicture.setImageBitmap(detectBitmap)
+                        }
+                        if(OpenCVLoader.initDebug()) {
+                            Log.e("JAMES", "Opencv initialization is done")
+                            myLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS)
+                            val objectDetectBitmap=runObjectDetection(detectBitmap.copy(Bitmap.Config.ARGB_8888,true))
+                            val detectMat=bitmapToMat(detectBitmap)
+                            Log.e("JAMES","Mat_Size:"+detectMat.size().toString())
+                            findNode(detectMat)
+                            val detectDoneMat=detectHoughLinesP(detectMat)
+                            detectionBitmap=drawLinedetection(objectDetectBitmap)
+                            Log.e("JAMES","logicResult:"+ObjectDetectResultArrayList.toString())
+                            for(i in 0 until ObjectDetectResultArrayList.size){
+                                checkInput(ObjectDetectResultArrayList[i],LongMergeLineArrayList)
+                            }
+                            sendMessage(1)
+                        }
+                        else{
+                            Log.e("JAMES","Opencv is not loaded. try again")
+                            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION,applicationContext,myLoaderCallback)
+                        }
+                })
+                sendMessage(0)
+                thread_detect_Circuit.start()
+            }
+            else {
                 val source = ImageDecoder.createSource(contentResolver, pictrueUri)
-                thread_decodeBitmap=Thread(Runnable {
+                thread_detect_Circuit= Thread(Runnable {
                     detectBitmap = ImageDecoder.decodeBitmap(source)
+
+                    detectBitmap=resizeBitmapSize(detectBitmap,700,400)
                     runOnUiThread{
                         binding.imageViewDetectPicture.setImageBitmap(detectBitmap)
                     }
+                    if(OpenCVLoader.initDebug()) {
+                        Log.e("JAMES", "Opencv initialization is done")
+                        myLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS)
+                        val objectDetectBitmap=runObjectDetection(detectBitmap.copy(Bitmap.Config.ARGB_8888,true))
+                        val detectMat=bitmapToMat(detectBitmap)
+                        Log.e("JAMES","Mat_Size:"+detectMat.size().toString())
+                        findNode(detectMat)
+                        val detectDoneMat=detectHoughLinesP(detectMat)
+                        detectionBitmap=drawLinedetection(objectDetectBitmap)
+                        Log.e("JAMES","logicResult:"+ObjectDetectResultArrayList.toString())
+                        for(i in 0 until ObjectDetectResultArrayList.size){
+                            checkInput(ObjectDetectResultArrayList[i],LongMergeLineArrayList)
+                        }
+                        sendMessage(1)
+                    }
+                    else{
+                        Log.e("JAMES","Opencv is not loaded. try again")
+                        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION,applicationContext,myLoaderCallback)
+                    }
+
                 })
-                thread_decodeBitmap.start()
+                sendMessage(0)
+                thread_detect_Circuit.start()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -158,18 +188,34 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         super.onResume()
         Log.e("JAMES","detect_OnResume")
     }
+    private fun resizeBitmapSize(bitmap: Bitmap,newWidth:Int,newHeight: Int):Bitmap{
+        val width=bitmap.width
+        val height=bitmap.height
+        val scaleWidth:Float=newWidth.toFloat()/width
+        val scaleHeight:Float=newHeight.toFloat()/height
+        val matrix:Matrix= Matrix()
+        matrix.postScale(scaleWidth,scaleHeight)
+        val resizeBitmap=Bitmap.createBitmap(bitmap,0,0,width,height,matrix,false)
+        bitmap.recycle()
+        return resizeBitmap
+    }
     private fun sendMessage(cmd:Int){
+        Log.e("JAMES","sendMessage start")
         val msg:Message= Message()
         msg.what=cmd
         mHandler.sendMessage(msg)
+        Log.e("JAMES","sendMessage end")
     }
     private fun bitmapToMat(bitmap: Bitmap):Mat{
+        Log.e("JAMES","bitmapToMat start")
         val mat:Mat=Mat()
         val bmp32=bitmap.copy(Bitmap.Config.ARGB_8888, true)
         Utils.bitmapToMat(bmp32,mat)
+        Log.e("JAMES","bitmapToMat end")
         return mat
     }
     private fun detectHoughLinesP(mat:Mat):Mat{
+        Log.e("JAMES","detectHoughLinesP start")
         val mResize:Mat= Mat()
         val mGray:Mat=Mat()
         val ret:Mat=Mat()
@@ -196,9 +242,9 @@ class detect_logic_picture_Activity : AppCompatActivity() {
             .thenBy { it.endPoint.y})
         Log.e("JAMES","lineArrayList Size:${lineArrayList.size}")
         mergeLineArrayList=processLines()
+        Log.e("JAMES","detectHoughLinesP end")
         return out
     }
-
     private fun processLines():ArrayList<Line> {
         val _lines_x= arrayListOf<Line>()
         val _lines_y= arrayListOf<Line>()
@@ -339,6 +385,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         return bitmap
     }
     private fun runObjectDetection(bitmap: Bitmap):Bitmap{
+        Log.e("JAMES","runObjectDetection start")
         val image = TensorImage.fromBitmap(bitmap)
         val options = ObjectDetector.ObjectDetectorOptions.builder()
             .setMaxResults(10)
@@ -351,10 +398,11 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         )
         val results = detector.detect(image)
         val drawingBitmap=drawObjectDetection(bitmap,results)
+        Log.e("JAMES","runObjectDetection end")
         return drawingBitmap
     }
     private fun drawObjectDetection(bitmap:Bitmap,results: List<Detection>):Bitmap {
-
+        Log.e("JAMES","drawObjectDetection start")
         val tempBitmap=bitmap.copy(Bitmap.Config.ARGB_8888,true)
         val canvas=Canvas(tempBitmap)
         for ((i, obj) in results.withIndex()) {
@@ -366,16 +414,18 @@ class detect_logic_picture_Activity : AppCompatActivity() {
             canvas.drawRect(box.left,box.top,box.right,box.bottom,paint)
             for ((j, category) in obj.categories.withIndex()) {
                 val textPaint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.DEV_KERN_TEXT_FLAG)
-                textPaint.textSize=50.0f
+                textPaint.textSize=10.0f
                 textPaint.typeface= Typeface.DEFAULT_BOLD
                 textPaint.setColor(Color.RED)
-                canvas.drawText(category.label,box.left+50,box.top-50,textPaint)
+                canvas.drawText(category.label,box.left,box.top-5,textPaint)
                 ObjectDetectResultArrayList.add(Logic_Object(category.label,box))
             }
         }
+        Log.e("JAMES","drawObjectDetection end")
         return tempBitmap
     }
     private fun drawLinedetection(bitmap: Bitmap):Bitmap{
+        Log.e("JAMES","drawLineDetection start")
         val tempBitmap=bitmap.copy(Bitmap.Config.ARGB_8888,true)
         val canvas=Canvas(tempBitmap)
         val paint=Paint().apply {
@@ -402,6 +452,34 @@ class detect_logic_picture_Activity : AppCompatActivity() {
             }
         }
         Log.e("JAMES","longMergeLine size:${LongMergeLineArrayList.size}")
+        Log.e("JAMES","drawLineDetection end")
         return tempBitmap
+    }
+    private fun findNode(detectMat:Mat){
+        Log.e("JAMES","findNode start")
+        val grayMat=Mat()
+        val coloeChannel:Int=
+            if (detectMat.channels() == 3) Imgproc.COLOR_BGR2GRAY else if (detectMat.channels() == 4) Imgproc.COLOR_BGRA2GRAY else 1
+        Imgproc.cvtColor(detectMat,grayMat,coloeChannel)
+        Imgproc.GaussianBlur(grayMat,grayMat, Size(9.0,9.0),2.0,2.0)
+        val dp:Double=1.2
+        val minDist:Double=100.0
+        val minRadius:Int=0
+        val maxRadius:Int=0
+        val param1 = 70.0
+        val param2 = 72.0
+        val circles=Mat()
+        Imgproc.HoughCircles(grayMat,circles,Imgproc.CV_HOUGH_GRADIENT,dp,minDist,
+            param1,param2,minRadius,maxRadius)
+        val numberOfCircles= if (circles.rows() == 0) 0 else circles.cols()
+        Log.e("JAMES","numOfCircle:$numberOfCircles")
+        for(i in 0 until numberOfCircles){
+            val circleCoordinates = circles[0, i]
+            val x:Int=circleCoordinates[0].toInt()
+            val y:Int=circleCoordinates[1].toInt()
+            val radius:Int=circleCoordinates[2].toInt()
+            NodeArrayList.add(Node(Point(x.toDouble(),y.toDouble()),radius))
+        }
+        Log.e("JAMES","findNode end")
     }
 }
