@@ -11,7 +11,6 @@ import android.os.Handler
 import android.os.Message
 import android.provider.MediaStore
 import android.util.Log
-import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.example.logic_object_detection.databinding.ActivityDetectLogicPictureBinding
@@ -32,14 +31,16 @@ class detect_logic_picture_Activity : AppCompatActivity() {
     private lateinit var thread_detect_Circuit:Thread
     private lateinit var detectBitmap:Bitmap
     private lateinit var detectionBitmap:Bitmap
+    private lateinit var testBitmap:Bitmap
     private lateinit var lineArrayList: ArrayList<Line>
     private lateinit var mergeLineArrayList: ArrayList<Line>
     private lateinit var LongMergeLineArrayList: ArrayList<Line>
+    private lateinit var NodeArrayList:ArrayList<Node>
     private lateinit var ObjectDetectResultArrayList:ArrayList<Logic_Object>
     private lateinit var progressDialog: ProgressDialog
-    private val min_degree_to_merge=10
-    private val min_distance_to_merge=15
-    private var resizeTimes:Float=3.0f
+    private val min_degree_to_merge=0
+    private val min_distance_to_merge=30
+    private var resizeTimes:Float=1.0f
     private val myLoaderCallback: BaseLoaderCallback =object : BaseLoaderCallback(this){
         override fun onManagerConnected(status: Int) {
             when(status){
@@ -66,6 +67,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                 1->{
                     Log.e("JAMES","in message 1")
                     binding.imageViewLineDetect.setImageBitmap(detectionBitmap)
+                    //binding.imageViewLineDetect.setImageBitmap(testBitmap)
                     try {
                         progressDialog.dismiss()
                     }catch (e:UninitializedPropertyAccessException){
@@ -75,7 +77,6 @@ class detect_logic_picture_Activity : AppCompatActivity() {
             }
         }
     }
-    private lateinit var NodeArrayList:ArrayList<Node>
     private fun checkInput(logicObject: Logic_Object,lines:ArrayList<Line>) {
         val rangeX=logicObject.box.left
         val rangeTop=logicObject.box.top
@@ -163,6 +164,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                         findNode(detectMat)
                         val detectDoneMat=detectHoughLinesP(detectMat)
                         detectionBitmap=drawLinedetection(objectDetectBitmap)
+                        detectionBitmap=drawNodeDetection(detectionBitmap)
                         Log.e("JAMES","logicResult:"+ObjectDetectResultArrayList.toString())
                         for(i in 0 until ObjectDetectResultArrayList.size){
                             checkInput(ObjectDetectResultArrayList[i],LongMergeLineArrayList)
@@ -226,7 +228,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         Imgproc.adaptiveThreshold(mGray,ret,255.0,Imgproc.ADAPTIVE_THRESH_MEAN_C,
             Imgproc.THRESH_BINARY_INV,55,10.0)
         ret.convertTo(mEdge,CvType.CV_8UC1)
-        Imgproc.HoughLinesP(mEdge,lines,1.0,Math.PI/180.0,100,10.0,1.0)
+        Imgproc.HoughLinesP(mEdge,lines,1.0,Math.PI/180.0,10,0.0,0.0)
         val out = Mat.zeros(mGray.size(), mGray.type())
         for (i in 0 until lines.rows()) {
             val data = IntArray(4)
@@ -379,7 +381,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         return lineDistance
     }
 
-    private fun matToBitmap(mat: Mat):Bitmap?{
+    private fun matToBitmap(mat: Mat):Bitmap{
         val bitmap:Bitmap=Bitmap.createBitmap(mat.width(),mat.height(),Bitmap.Config.ARGB_8888)
         Utils.matToBitmap(mat, bitmap)
         return bitmap
@@ -430,16 +432,8 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         val canvas=Canvas(tempBitmap)
         val paint=Paint().apply {
             color=Color.BLUE
-            strokeWidth=10f
+            strokeWidth=5f
         }
-//        for(i in 0 until lineArrayList.size){
-//            val startPoint=lineArrayList[i].startPoint
-//            val endPoint=lineArrayList[i].endPoint
-//            canvas.drawLine(startPoint.x.toFloat()*resizeTimes,
-//                            startPoint.y.toFloat()*resizeTimes,
-//                            endPoint.x.toFloat()*resizeTimes,
-//                            endPoint.y.toFloat()*resizeTimes,paint)
-//        }
         for(i in 0 until mergeLineArrayList.size){
             val startPoint=mergeLineArrayList[i].startPoint
             val endPoint=mergeLineArrayList[i].endPoint
@@ -455,31 +449,46 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         Log.e("JAMES","drawLineDetection end")
         return tempBitmap
     }
-    private fun findNode(detectMat:Mat){
-        Log.e("JAMES","findNode start")
-        val grayMat=Mat()
-        val coloeChannel:Int=
-            if (detectMat.channels() == 3) Imgproc.COLOR_BGR2GRAY else if (detectMat.channels() == 4) Imgproc.COLOR_BGRA2GRAY else 1
-        Imgproc.cvtColor(detectMat,grayMat,coloeChannel)
-        Imgproc.GaussianBlur(grayMat,grayMat, Size(9.0,9.0),2.0,2.0)
-        val dp:Double=1.2
-        val minDist:Double=100.0
-        val minRadius:Int=0
-        val maxRadius:Int=0
-        val param1 = 70.0
-        val param2 = 72.0
-        val circles=Mat()
-        Imgproc.HoughCircles(grayMat,circles,Imgproc.CV_HOUGH_GRADIENT,dp,minDist,
-            param1,param2,minRadius,maxRadius)
-        val numberOfCircles= if (circles.rows() == 0) 0 else circles.cols()
-        Log.e("JAMES","numOfCircle:$numberOfCircles")
-        for(i in 0 until numberOfCircles){
-            val circleCoordinates = circles[0, i]
-            val x:Int=circleCoordinates[0].toInt()
-            val y:Int=circleCoordinates[1].toInt()
-            val radius:Int=circleCoordinates[2].toInt()
-            NodeArrayList.add(Node(Point(x.toDouble(),y.toDouble()),radius))
+    private fun drawNodeDetection(bitmap:Bitmap):Bitmap{
+        val tempBitmap=bitmap.copy(Bitmap.Config.ARGB_8888,true)
+        val canvas=Canvas(tempBitmap)
+        val paint=Paint().apply {
+            color=Color.GREEN
+            strokeWidth=1f
         }
-        Log.e("JAMES","findNode end")
+        for (i in 0 until NodeArrayList.size)
+        {
+            val node=NodeArrayList[i]
+            val x=node.center.x.toFloat()
+            val y=node.center.y.toFloat()
+            val radius=node.radius.toFloat()
+            canvas.drawCircle(x,y,10f,paint)
+        }
+        return  tempBitmap
+    }
+    private fun findNode(detectMat:Mat){
+        val myGray=Mat()
+        val thresh=Mat()
+        val cnts=Mat()
+        val contours:ArrayList<MatOfPoint> = arrayListOf()
+        Imgproc.cvtColor(detectMat,myGray,Imgproc.COLOR_RGB2GRAY)
+        Imgproc.adaptiveThreshold(myGray,thresh,255.0,Imgproc.ADAPTIVE_THRESH_MEAN_C,
+            Imgproc.THRESH_BINARY_INV,55,10.0)
+        val findCircle=thresh.clone()
+        val kernel:Mat=
+            Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE,Size(3.0,3.0))
+        Imgproc.morphologyEx(findCircle,findCircle,Imgproc.MORPH_OPEN,kernel,Point(-1.0,-1.0),3)
+        Imgproc.findContours(findCircle,contours,cnts,Imgproc.RETR_EXTERNAL,Imgproc.CHAIN_APPROX_SIMPLE)
+        for (i in 0 until contours.size){
+            val area=Imgproc.contourArea(contours[i])
+            Log.e("JAMES","area_$i:$area")
+            if(area >50){
+                val mu=Imgproc.moments(contours.get(i),false)
+                val x = (mu._m10 / mu._m00)
+                val y = (mu._m01 / mu._m00)
+                NodeArrayList.add(Node(Point(x,y),10))
+            }
+        }
+
     }
 }
