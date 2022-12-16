@@ -41,6 +41,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
     private val min_degree_to_merge=0
     private val min_distance_to_merge=30
     private var resizeTimes:Float=1.0f
+    private var nodeArea:Int=50
     private val myLoaderCallback: BaseLoaderCallback =object : BaseLoaderCallback(this){
         override fun onManagerConnected(status: Int) {
             when(status){
@@ -189,6 +190,9 @@ class detect_logic_picture_Activity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         Log.e("JAMES","detect_OnResume")
+        binding.buttonDetectPicVar.setOnClickListener {
+            
+        }
     }
     private fun resizeBitmapSize(bitmap: Bitmap,newWidth:Int,newHeight: Int):Bitmap{
         val width=bitmap.width
@@ -482,7 +486,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         for (i in 0 until contours.size){
             val area=Imgproc.contourArea(contours[i])
             Log.e("JAMES","area_$i:$area")
-            if(area >50){
+            if(area >nodeArea){
                 val mu=Imgproc.moments(contours.get(i),false)
                 val x = (mu._m10 / mu._m00)
                 val y = (mu._m01 / mu._m00)
