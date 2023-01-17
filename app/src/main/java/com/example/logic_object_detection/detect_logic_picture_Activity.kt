@@ -11,9 +11,12 @@ import android.os.Handler
 import android.os.Message
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.SeekBar
+import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.example.logic_object_detection.databinding.ActivityDetectLogicPictureBinding
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import org.opencv.android.BaseLoaderCallback
 import org.opencv.android.LoaderCallbackInterface
 import org.opencv.android.OpenCVLoader
@@ -38,8 +41,11 @@ class detect_logic_picture_Activity : AppCompatActivity() {
     private lateinit var NodeArrayList:ArrayList<Node>
     private lateinit var ObjectDetectResultArrayList:ArrayList<Logic_Object>
     private lateinit var progressDialog: ProgressDialog
-    private val min_degree_to_merge=0
-    private val min_distance_to_merge=30
+    private lateinit var seekBar_degree:SeekBar
+    private lateinit var seekBar_distance:SeekBar
+    private lateinit var seekBar_NodeArea: SeekBar
+    private var min_degree_to_merge=0
+    private var min_distance_to_merge=30
     private var resizeTimes:Float=1.0f
     private var nodeArea:Int=50
     private val myLoaderCallback: BaseLoaderCallback =object : BaseLoaderCallback(this){
@@ -133,6 +139,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                             findNode(detectMat)
                             val detectDoneMat=detectHoughLinesP(detectMat)
                             detectionBitmap=drawLinedetection(objectDetectBitmap)
+                            detectionBitmap=drawNodeDetection(detectionBitmap)
                             Log.e("JAMES","logicResult:"+ObjectDetectResultArrayList.toString())
                             for(i in 0 until ObjectDetectResultArrayList.size){
                                 checkInput(ObjectDetectResultArrayList[i],LongMergeLineArrayList)
@@ -151,7 +158,6 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                 val source = ImageDecoder.createSource(contentResolver, pictrueUri)
                 thread_detect_Circuit= Thread(Runnable {
                     detectBitmap = ImageDecoder.decodeBitmap(source)
-
                     detectBitmap=resizeBitmapSize(detectBitmap,700,400)
                     runOnUiThread{
                         binding.imageViewDetectPicture.setImageBitmap(detectBitmap)
@@ -191,8 +197,90 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         super.onResume()
         Log.e("JAMES","detect_OnResume")
         binding.buttonDetectPicVar.setOnClickListener {
-            
+            showDetectPictureView()
         }
+    }
+    private fun showDetectPictureView(){
+        val dialog=BottomSheetDialog(this)
+        dialog.setContentView(R.layout.detect_picture_var_view)
+        seekBar_degree= dialog.findViewById<SeekBar>(R.id.seekBar_degree)!!
+        seekBar_distance=dialog.findViewById<SeekBar>(R.id.seekBar_distance)!!
+        seekBar_NodeArea=dialog.findViewById<SeekBar>(R.id.seekBar_NodeArea)!!
+        seekBar_degree.progress=min_degree_to_merge
+        seekBar_distance.progress=min_distance_to_merge
+        seekBar_NodeArea.progress=nodeArea
+        val tv_progressDegree=dialog.findViewById<TextView>(R.id.tv_progressDegree)
+        val tv_progressDistance=dialog.findViewById<TextView>(R.id.tv_progressDistance)
+        val tv_progressNodeArea=dialog.findViewById<TextView>(R.id.tv_progressNodeArea)
+        tv_progressDegree!!.text="$min_degree_to_merge"
+        tv_progressDistance!!.text="$min_distance_to_merge"
+        tv_progressNodeArea!!.text="$nodeArea"
+        val newThread:Thread= Thread(Runnable {
+            runOnUiThread{
+                binding.imageViewDetectPicture.setImageBitmap(detectBitmap)
+            }
+            if(OpenCVLoader.initDebug()) {
+                Log.e("JAMES", "Opencv initialization is done")
+                testBitmap=detectBitmap.copy(Bitmap.Config.ARGB_8888,true)
+                myLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS)
+                val objectDetectBitmap=runObjectDetection(detectBitmap.copy(Bitmap.Config.ARGB_8888,true))
+                val detectMat=bitmapToMat(detectBitmap)
+                Log.e("JAMES","Mat_Size:"+detectMat.size().toString())
+                findNode(detectMat)
+                val detectDoneMat=detectHoughLinesP(detectMat)
+                detectionBitmap=drawLinedetection(objectDetectBitmap)
+                detectionBitmap=drawNodeDetection(detectionBitmap)
+                Log.e("JAMES","logicResult:"+ObjectDetectResultArrayList.toString())
+                for(i in 0 until ObjectDetectResultArrayList.size){
+                    checkInput(ObjectDetectResultArrayList[i],LongMergeLineArrayList)
+                }
+                sendMessage(1)
+            }
+            else{
+                Log.e("JAMES","Opencv is not loaded. try again")
+                OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION,applicationContext,myLoaderCallback)
+            }
+        })
+        dialog.setOnDismissListener {
+            sendMessage(0)
+            newThread.start()
+            Log.e("JAMES","close bottom of dialog")
+        }
+        seekBar_degree!!.setOnSeekBarChangeListener(object :SeekBar.OnSeekBarChangeListener{
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+               tv_progressDegree!!.text="$progress"
+               min_degree_to_merge=progress
+            }
+            override fun onStartTrackingTouch(p0: SeekBar?) {
+            }
+            override fun onStopTrackingTouch(p0: SeekBar?) {
+            }
+        })
+        seekBar_distance!!.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                tv_progressDistance!!.text="$progress"
+                min_distance_to_merge=progress
+            }
+            override fun onStartTrackingTouch(p0: SeekBar?) {
+            }
+            override fun onStopTrackingTouch(p0: SeekBar?) {
+            }
+        })
+        seekBar_NodeArea!!.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                tv_progressNodeArea!!.text="$progress"
+                nodeArea=progress
+            }
+
+            override fun onStartTrackingTouch(p0: SeekBar?) {
+            }
+
+            override fun onStopTrackingTouch(p0: SeekBar?) {
+            }
+
+        })
+        
+        dialog.show()
     }
     private fun resizeBitmapSize(bitmap: Bitmap,newWidth:Int,newHeight: Int):Bitmap{
         val width=bitmap.width
@@ -454,6 +542,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         return tempBitmap
     }
     private fun drawNodeDetection(bitmap:Bitmap):Bitmap{
+        Log.e("JAMES","drawNodeDetection")
         val tempBitmap=bitmap.copy(Bitmap.Config.ARGB_8888,true)
         val canvas=Canvas(tempBitmap)
         val paint=Paint().apply {
@@ -471,6 +560,8 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         return  tempBitmap
     }
     private fun findNode(detectMat:Mat){
+        NodeArrayList= ArrayList()
+        Log.e("JAMES","findNode")
         val myGray=Mat()
         val thresh=Mat()
         val cnts=Mat()
@@ -483,6 +574,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
             Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE,Size(3.0,3.0))
         Imgproc.morphologyEx(findCircle,findCircle,Imgproc.MORPH_OPEN,kernel,Point(-1.0,-1.0),3)
         Imgproc.findContours(findCircle,contours,cnts,Imgproc.RETR_EXTERNAL,Imgproc.CHAIN_APPROX_SIMPLE)
+        testBitmap=matToBitmap(findCircle)
         for (i in 0 until contours.size){
             val area=Imgproc.contourArea(contours[i])
             Log.e("JAMES","area_$i:$area")
@@ -493,6 +585,6 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                 NodeArrayList.add(Node(Point(x,y),10))
             }
         }
-
+        Log.e("JAMES","nodeArrayList_${NodeArrayList.size}:"+NodeArrayList.toString())
     }
 }
