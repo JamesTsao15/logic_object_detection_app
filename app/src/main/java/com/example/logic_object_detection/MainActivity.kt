@@ -6,11 +6,11 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -22,6 +22,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.logic_object_detection.databinding.ActivityMainBinding
+import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Session
+import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import java.io.File
@@ -32,6 +35,8 @@ import java.io.InputStream
 class MainActivity : AppCompatActivity() {
     private lateinit var activityMainBinding:ActivityMainBinding
     private lateinit var getImage:ActivityResultLauncher<String>
+    private lateinit var mSession:Session
+    var mUserRequestedInstall = true
     @RequiresApi(Build.VERSION_CODES.M)
     private val CAMERA_ACTION_CODE=100
     private lateinit var uri: Uri
@@ -40,6 +45,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         activityMainBinding=ActivityMainBinding.inflate(layoutInflater)
         setContentView(activityMainBinding.root)
+        maybeEnableArButton()
         val hasPermission:Boolean=checkCameraPermission(this)
         Log.e("JAMES","camera_permission:$hasPermission")
         activityMainBinding.imgViewShowPhoto.setImageResource(R.drawable.image)
@@ -52,16 +58,9 @@ class MainActivity : AppCompatActivity() {
                     options.inJustDecodeBounds = true
                     val inputStream: InputStream? =contentResolver.openInputStream(uri)
                     BitmapFactory.decodeStream(inputStream,null,options)
-                    val imageHeight = options.outHeight
-                    val imageWidth = options.outWidth
-                    Log.e("JAMES","$imageWidth,$imageHeight")
-                    if((imageWidth>imageHeight) ||(imageWidth==imageHeight)){
-                        activityMainBinding.imgViewShowPhoto.setImageURI(it)
-                        activityMainBinding.btnNextStep.visibility= View.VISIBLE
-                    }
-                    else{
-                        Toast.makeText(this,"請挑選橫向照片",Toast.LENGTH_SHORT).show()
-                    }
+                    activityMainBinding.imgViewShowPhoto.setImageURI(it)
+                    activityMainBinding.btnNextStep.visibility= View.VISIBLE
+                    Log.e("JAMES","inLoop")
                 }catch (e:FileNotFoundException){
                     e.stackTrace
                     Toast.makeText(this,"找不到此檔案",Toast.LENGTH_SHORT).show()
@@ -76,9 +75,25 @@ class MainActivity : AppCompatActivity() {
         })
 
     }
-
+    fun maybeEnableArButton() {
+        val availability = ArCoreApk.getInstance().checkAvailability(this)
+        if (availability.isTransient) {
+            // Continue to query availability at 5Hz while compatibility is checked in the background.
+            Handler().postDelayed({
+                maybeEnableArButton()
+            }, 200)
+        }
+        if (availability.isSupported) {
+            activityMainBinding.btnTakePhoto.visibility = View.VISIBLE
+            activityMainBinding.btnTakePhoto.isEnabled = true
+        } else { // The device is unsupported or unknown.
+            activityMainBinding.btnTakePhoto.visibility = View.INVISIBLE
+            activityMainBinding.btnTakePhoto.isEnabled = false
+        }
+    }
     override fun onResume() {
         super.onResume()
+        checkARCoreInstallStatus()
         activityMainBinding.btnTakePhoto.setOnClickListener{
             Log.e("JAMES","on_click_take_photo")
             val intent=Intent(this,CameraActivity::class.java)
@@ -95,6 +110,25 @@ class MainActivity : AppCompatActivity() {
         }
 
     }
+
+    private fun checkARCoreInstallStatus() {
+        try {
+                when(ArCoreApk.getInstance().requestInstall(this,
+                    mUserRequestedInstall)){
+                    ArCoreApk.InstallStatus.INSTALLED -> {
+                        // Success: Safe to create the AR session.
+                        mSession = Session(this)
+                    }
+                    ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
+                        mUserRequestedInstall = false
+                        return
+                    }
+                }
+        }catch (e: UnavailableUserDeclinedInstallationException){
+            Log.e("JAMES","TODO: handle exception " + e)
+        }
+    }
+
     private fun checkCameraPermission(activity:Activity):Boolean {
         val cameraPermissionCheck:Int = ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA);
         val readPermissionCheck:Int = ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE);

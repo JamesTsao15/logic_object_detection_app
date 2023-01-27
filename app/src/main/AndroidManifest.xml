@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-
+    <uses-feature android:name="android.hardware.camera.ar" android:required="true"/>
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -17,6 +17,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Logic_object_detection"
         tools:targetApi="31">
+        <meta-data android:name="com.google.ar.core" android:value="optional"/>
         <activity
             android:name=".detect_logic_picture_Activity"
             android:exported="false"
@@ -27,8 +28,7 @@
         </activity>
         <activity
             android:name=".CameraActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

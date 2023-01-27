@@ -68,6 +68,7 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                     Log.e("JAMES","in message 0")
                     progressDialog= ProgressDialog(this@detect_logic_picture_Activity).apply {
                         setMessage("轉化電路中......")
+                        setCanceledOnTouchOutside(false)
                     }
                     progressDialog.show()
                 }
