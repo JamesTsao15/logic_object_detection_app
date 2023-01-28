@@ -2,29 +2,45 @@ package com.example.logic_object_detection
 
 
 import android.content.res.Configuration
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.graphics.*
 import android.graphics.ImageFormat
-import android.graphics.Matrix
-import android.graphics.Rect
-import android.graphics.YuvImage
 import android.media.Image
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import com.google.ar.core.Config
-import com.google.ar.core.Frame
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import com.google.ar.core.*
 import com.google.ar.core.exceptions.NotYetAvailableException
+import com.google.ar.sceneform.AnchorNode
 import com.google.ar.sceneform.FrameTime
+import com.google.ar.sceneform.math.Vector3
+import com.google.ar.sceneform.rendering.ModelRenderable
+import com.google.ar.sceneform.rendering.Renderable
+import com.google.ar.sceneform.rendering.Texture
 import com.google.ar.sceneform.ux.ArFragment
+import com.google.ar.sceneform.ux.TransformableNode
+import com.gorisse.thomas.sceneform.scene.await
 import org.tensorflow.lite.support.image.TensorImage
+import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
-import java.io.ByteArrayOutputStream
+import java.io.*
+import java.util.concurrent.CompletableFuture
+import java.util.function.Consumer
+import java.util.function.Function
 
 class CustomArFragment: ArFragment() {
+    private var loadDone:Boolean=false
+    private var AND_model:Renderable?=null
+    private var OR_model:Renderable?=null
+    private var NOT_model:Renderable?=null
+    private var NAND_model:Renderable?=null
+    private var NOR_model:Renderable?=null
+    private var XOR_model:Renderable?=null
+    private val scene get() = arSceneView.scene
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -37,6 +53,9 @@ class CustomArFragment: ArFragment() {
             config.setFocusMode(Config.FocusMode.AUTO)
             arSceneView.session?.configure(config)
         }
+        lifecycleScope.launchWhenCreated {
+            loadModels()
+        }
         return view
     }
 
@@ -46,10 +65,41 @@ class CustomArFragment: ArFragment() {
             val image=frame.acquireCameraImage()
             val bitmap=frameToBitmap(image)
             image.close()
-            runOjectDetection(bitmap)
+            val objectInfo=runOjectDetection(bitmap)
         }catch (e: NotYetAvailableException){
             Log.e("JAMES","frame is not ready")
         }
+        setOnTapArPlaneListener{
+                hitResult,plane,motionEvent->
+            Log.e("JAMES","inTapLoop")
+            if(AND_model!=null){
+                Log.e("JAMES","model is not null")
+                val transformableNode=TransformableNode(this.transformationSystem)
+                transformableNode.apply {
+                    renderable=AND_model
+                    renderableInstance.setCulling(false)
+                    renderableInstance.animate(true).start()
+                }
+                scene.addChild(AnchorNode(hitResult.createAnchor()).apply {
+                    addChild(transformableNode)
+                })
+            }
+            else{
+                Log.e("JAMES","model is null")
+            }
+
+        }
+    }
+
+    private fun drawARObject() {
+        if (loadDone==false){
+            Toast.makeText(requireContext(),"載入模型中．．．",Toast.LENGTH_SHORT).show()
+            return
+        }
+       val transformableNode=TransformableNode(this.transformationSystem)
+        transformableNode.localPosition= Vector3(10f,10f,10f)
+        transformableNode.renderable=AND_model
+        scene.addChild(transformableNode)
     }
 
     fun frameToBitmap(cameraImage: Image):Bitmap{
@@ -58,7 +108,7 @@ class CustomArFragment: ArFragment() {
         val cameraPlaneU = cameraImage.planes[1].buffer
         val cameraPlaneV = cameraImage.planes[2].buffer
 
-//Use the buffers to create a new byteArray that
+        //Use the buffers to create a new byteArray that
         val compositeByteArray = ByteArray(cameraPlaneY.capacity() + cameraPlaneU.capacity() + cameraPlaneV.capacity())
 
         cameraPlaneY.get(compositeByteArray, 0, cameraPlaneY.capacity())
@@ -80,7 +130,7 @@ class CustomArFragment: ArFragment() {
         }
 
     }
-    fun runOjectDetection(bitmap:Bitmap){
+    fun runOjectDetection(bitmap:Bitmap): MutableList<Detection>? {
         val image=TensorImage.fromBitmap(bitmap)
         val options = ObjectDetector.ObjectDetectorOptions.builder()
             .setMaxResults(10)
@@ -92,6 +142,13 @@ class CustomArFragment: ArFragment() {
             options
         )
         val results = detector.detect(image)
-        Log.e("JAMES",results.toString())
+        return results
+    }
+    private suspend fun loadModels() {
+        AND_model = ModelRenderable.builder()
+            .setSource(context, Uri.parse("and_logic.glb"))
+            .setIsFilamentGltf(true)
+            .await()
+        Log.e("JAMES", "is load Done")
     }
 }
