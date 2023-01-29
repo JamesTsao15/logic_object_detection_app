@@ -50,6 +50,7 @@ class CustomArFragment: ArFragment() {
         arSceneView.scene.addOnUpdateListener {
             frameTime->
             val config=Config(arSceneView.session)
+            config.setLightEstimationMode(Config.LightEstimationMode.ENVIRONMENTAL_HDR)
             config.setFocusMode(Config.FocusMode.AUTO)
             arSceneView.session?.configure(config)
         }
@@ -68,26 +69,6 @@ class CustomArFragment: ArFragment() {
             val objectInfo=runOjectDetection(bitmap)
         }catch (e: NotYetAvailableException){
             Log.e("JAMES","frame is not ready")
-        }
-        setOnTapArPlaneListener{
-                hitResult,plane,motionEvent->
-            Log.e("JAMES","inTapLoop")
-            if(AND_model!=null){
-                Log.e("JAMES","model is not null")
-                val transformableNode=TransformableNode(this.transformationSystem)
-                transformableNode.apply {
-                    renderable=AND_model
-                    renderableInstance.setCulling(false)
-                    renderableInstance.animate(true).start()
-                }
-                scene.addChild(AnchorNode(hitResult.createAnchor()).apply {
-                    addChild(transformableNode)
-                })
-            }
-            else{
-                Log.e("JAMES","model is null")
-            }
-
         }
     }
 
@@ -147,6 +128,26 @@ class CustomArFragment: ArFragment() {
     private suspend fun loadModels() {
         AND_model = ModelRenderable.builder()
             .setSource(context, Uri.parse("and_logic.glb"))
+            .setIsFilamentGltf(true)
+            .await()
+        OR_model = ModelRenderable.builder()
+            .setSource(context, Uri.parse("or_logic.glb"))
+            .setIsFilamentGltf(true)
+            .await()
+        NOR_model = ModelRenderable.builder()
+            .setSource(context, Uri.parse("nor_logic.glb"))
+            .setIsFilamentGltf(true)
+            .await()
+        NAND_model = ModelRenderable.builder()
+            .setSource(context, Uri.parse("nand_logic.glb"))
+            .setIsFilamentGltf(true)
+            .await()
+        XOR_model = ModelRenderable.builder()
+            .setSource(context, Uri.parse("xor_logic.glb"))
+            .setIsFilamentGltf(true)
+            .await()
+        NOT_model = ModelRenderable.builder()
+            .setSource(context, Uri.parse("not_logic.glb"))
             .setIsFilamentGltf(true)
             .await()
         Log.e("JAMES", "is load Done")
