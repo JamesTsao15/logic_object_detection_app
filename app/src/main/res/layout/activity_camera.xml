@@ -9,6 +9,8 @@
         android:id="@+id/ArFagment"
         android:name="com.example.logic_object_detection.CustomArFragment"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="match_parent">
+
+    </fragment>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -9,18 +9,23 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.View.OnTouchListener
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import com.google.ar.core.*
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.sceneform.AnchorNode
 import com.google.ar.sceneform.FrameTime
+import com.google.ar.sceneform.collision.Plane
+import com.google.ar.sceneform.collision.Ray
+import com.google.ar.sceneform.math.Quaternion
 import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.rendering.ModelRenderable
 import com.google.ar.sceneform.rendering.Renderable
-import com.google.ar.sceneform.rendering.Texture
 import com.google.ar.sceneform.ux.ArFragment
 import com.google.ar.sceneform.ux.TransformableNode
 import com.gorisse.thomas.sceneform.scene.await
@@ -28,11 +33,8 @@ import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import java.io.*
-import java.util.concurrent.CompletableFuture
-import java.util.function.Consumer
-import java.util.function.Function
 
-class CustomArFragment: ArFragment() {
+class CustomArFragment: ArFragment(){
     private var loadDone:Boolean=false
     private var AND_model:Renderable?=null
     private var OR_model:Renderable?=null
@@ -40,7 +42,9 @@ class CustomArFragment: ArFragment() {
     private var NAND_model:Renderable?=null
     private var NOR_model:Renderable?=null
     private var XOR_model:Renderable?=null
+    private var ARObjectArraylist:ArrayList<ARObject> = ArrayList()
     private val scene get() = arSceneView.scene
+    private val session get() = arSceneView.session!!
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -52,6 +56,7 @@ class CustomArFragment: ArFragment() {
             val config=Config(arSceneView.session)
             config.setLightEstimationMode(Config.LightEstimationMode.ENVIRONMENTAL_HDR)
             config.setFocusMode(Config.FocusMode.AUTO)
+            config.setPlaneFindingMode(Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL)
             arSceneView.session?.configure(config)
         }
         lifecycleScope.launchWhenCreated {
@@ -63,25 +68,89 @@ class CustomArFragment: ArFragment() {
     override fun onUpdate(frameTime: FrameTime?) {
         try {
             val frame: Frame=arSceneView.arFrame!!
-            val image=frame.acquireCameraImage()
-            val bitmap=frameToBitmap(image)
-            image.close()
-            val objectInfo=runOjectDetection(bitmap)
+            if(frame.camera.trackingState==TrackingState.TRACKING){
+                val image=frame.acquireCameraImage()
+                val bitmap=frameToBitmap(image)
+                val resizeBitmap=Bitmap.createScaledBitmap(bitmap,arSceneView.width,arSceneView.height,true)
+                image.close()
+                val objectInfo=runOjectDetection(resizeBitmap)
+                Log.e("JAMES","bitmap:${resizeBitmap.width},${resizeBitmap.height}")
+                Log.e("JAMES","arFragment:${arSceneView.width},${arSceneView.height}")
+                //requireActivity().findViewById<ImageView>(R.id.imageView2).setImageBitmap(bitmap)
+                createAnchor(objectInfo)
+                removeAllARObject()
+                drawARObject()
+            }
+            else{
+                Toast.makeText(requireContext(),"檢測平面中...請試圖移動手機",Toast.LENGTH_SHORT).show()
+            }
         }catch (e: NotYetAvailableException){
             Log.e("JAMES","frame is not ready")
         }
     }
-
     private fun drawARObject() {
-        if (loadDone==false){
-            Toast.makeText(requireContext(),"載入模型中．．．",Toast.LENGTH_SHORT).show()
-            return
+        removeAllARObject()
+        Log.e("JAMES","ARObject:"+ARObjectArraylist.toString())
+        for(obj in ARObjectArraylist){
+            val anchorNode:AnchorNode=AnchorNode(obj.anchor)
+            val transformableNode=TransformableNode(this.transformationSystem)
+            transformableNode.renderable=AND_model
+            anchorNode.addChild(transformableNode)
+            scene.addChild(anchorNode)
         }
-       val transformableNode=TransformableNode(this.transformationSystem)
-        transformableNode.localPosition= Vector3(10f,10f,10f)
-        transformableNode.renderable=AND_model
-        scene.addChild(transformableNode)
     }
+
+    private fun removeAllARObject() {
+        Log.e("JAMES","removeAllARObject")
+        try{
+            for(i in 0 until scene.children.size){
+                val node=scene.children.get(i)
+                if (node is AnchorNode) {
+                    scene.removeChild(node)
+                }
+            }
+        }catch (e:java.lang.IndexOutOfBoundsException){
+            Log.e("JAMES","Error in removeAllARObject")
+        }
+
+        Log.e("JAMES","removeAllARObject Done")
+    }
+
+    private fun createAnchor(results: MutableList<Detection>?) {
+        ARObjectArraylist= ArrayList()
+        val camera=scene.camera
+//        val ray:Ray=camera.screenPointToRay(0f,0f)
+//        val hitResult =scene.hitTest(ray,true)
+//        val hitPoint:Vector3=hitResult.point
+//        val quaternion=Quaternion.identity()
+//        val pose=Pose(
+//            floatArrayOf(hitPoint.x,hitPoint.y,hitPoint.z),
+//            floatArrayOf(quaternion.x,quaternion.y,quaternion.z,quaternion.w)
+//        )
+//        val anchor=session.createAnchor(pose)
+//        ARObjectArraylist.add(ARObject(label="test",anchor=anchor))
+        if(!results!!.isEmpty()){
+            for ((i,obj) in results.withIndex()){
+                    val box=obj.boundingBox
+                    val x=(box.left+box.right)/2
+                    val y=(box.top+box.bottom)/2
+                    val ray:Ray=camera.screenPointToRay(x,y)
+                    val hitResult =scene.hitTest(ray,true)
+                    val hitPoint:Vector3=hitResult.point
+                    val quaternion=Quaternion.identity()
+                    val pose=Pose(
+                        floatArrayOf(hitPoint.x,hitPoint.y,hitPoint.z),
+                        floatArrayOf(quaternion.x,quaternion.y,quaternion.z,quaternion.w)
+                    )
+                    val anchor=session.createAnchor(pose)
+                    for ((j, category) in obj.categories.withIndex()){
+                        val label=category.label
+                        ARObjectArraylist.add(ARObject(label=label,anchor=anchor))
+                    }
+                }
+
+            }
+        }
 
     fun frameToBitmap(cameraImage: Image):Bitmap{
         //The camera image received is in YUV YCbCr Format. Get buffers for each of the planes and use them to create a new bytearray defined by the size of all three buffers combined
@@ -152,4 +221,5 @@ class CustomArFragment: ArFragment() {
             .await()
         Log.e("JAMES", "is load Done")
     }
+
 }
