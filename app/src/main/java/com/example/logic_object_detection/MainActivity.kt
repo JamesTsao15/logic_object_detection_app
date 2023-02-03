@@ -96,7 +96,9 @@ class MainActivity : AppCompatActivity() {
         checkARCoreInstallStatus()
         activityMainBinding.btnTakePhoto.setOnClickListener{
             Log.e("JAMES","on_click_take_photo")
-            val intent=Intent(this,CameraActivity::class.java)
+            val intent = Intent(this, CameraActivity::class.java).apply {
+                putExtra(CameraActivity.TARGET_IMAGE_URI, uri)
+            }
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             startActivity(intent)
         }
