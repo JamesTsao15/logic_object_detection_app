@@ -30,28 +30,14 @@ class CameraActivity : AppCompatActivity()/*, Scene.OnUpdateListener */{
         arFragment =
             (supportFragmentManager.findFragmentById(R.id.ArFagment) as CustomArFragment).apply {
                 (intent.getParcelableExtra(TARGET_IMAGE_URI) as? Uri)?.let { uri ->
-                    targetBitmap =BitmapFactory.decodeStream(contentResolver.openInputStream(uri)).compress(1f).apply{
-                        Log.e("CameraActivity", "完成的Bitmap是=>${this}")
-                        Log.e("CameraActivity", "完成的Bitmap的大小是=>[${this.height},${this.width}]")
-                        Log.e("CameraActivity", "完成的Bitmap的密度是=>[${this.density}]")
-                    }
+                    targetBitmap =BitmapFactory.decodeStream(contentResolver.openInputStream(uri))
                 }
             }
-//        arFragment.arSceneView.scene.addOnUpdateListener(this)
+//        arFragment.arSceneView.scene.addOnUpdateListener(this) // 如果用不到就刪除是美德。
     }
 
 //    override fun onUpdate(frameTime: FrameTime?) {
 //        val frame: Frame = arFragment.arSceneView.arFrame!!
 //    }
-
-    private fun Bitmap.compress(scale: Float): Bitmap {
-        // Use matrix 改變圖片長、寬
-        val matrix = Matrix()
-        // 縮小的比例
-        matrix.setScale(scale, scale)
-        val after = Bitmap.createBitmap(this, 0, 0, this.width, this.height, matrix, true)
-//        this.recycle() //不可以回收，若回收的話會導致ArSceneActivity Destroy的時候失敗。
-        return after
-    }
 
 }
