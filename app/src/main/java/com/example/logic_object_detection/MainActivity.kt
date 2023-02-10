@@ -52,7 +52,9 @@ class MainActivity : AppCompatActivity() {
         getImage=registerForActivityResult(ActivityResultContracts.GetContent(),
         ActivityResultCallback{
             try{
-                uri=it
+                if (it != null) {
+                    uri=it
+                }
                 try{
                     val options = BitmapFactory.Options()
                     options.inJustDecodeBounds = true
@@ -66,6 +68,12 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this,"找不到此檔案",Toast.LENGTH_SHORT).show()
                 }
             }catch (e:java.lang.NullPointerException){
+                e.stackTrace
+                activityMainBinding.imgViewShowPhoto.setImageResource(R.drawable.image)
+                activityMainBinding.btnNextStep.visibility= View.INVISIBLE
+                Toast.makeText(this,"獲取圖片失敗",Toast.LENGTH_SHORT).show()
+            }
+            catch (e:UninitializedPropertyAccessException){
                 e.stackTrace
                 activityMainBinding.imgViewShowPhoto.setImageResource(R.drawable.image)
                 activityMainBinding.btnNextStep.visibility= View.INVISIBLE

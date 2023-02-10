@@ -13,17 +13,16 @@
         android:scaleType="center"
         app:layout_constraintDimensionRatio="1:1"
         app:layout_constraintEnd_toEndOf="@id/guideline3"
+        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="@id/guideline2"
         app:layout_constraintTop_toTopOf="@id/guideline4"
-        tools:layout_editor_absoluteX="0dp"
-        tools:layout_editor_absoluteY="3dp"
         tools:srcCompat="@tools:sample/backgrounds/scenic" />
 
     <Button
         android:id="@+id/btnTakePhoto"
         android:layout_width="200dp"
         android:layout_height="75dp"
-        android:text="拍攝照片"
+        android:text="擴增實境\n智慧相機"
         android:textSize="20dp"
         app:layout_constraintBottom_toBottomOf="@id/guideline8"
         app:layout_constraintDimensionRatio="1:1"
@@ -33,28 +32,29 @@
 
     <Button
         android:id="@+id/btnNextStep"
-        android:layout_width="200dp"
-        android:layout_height="75dp"
-        android:layout_marginTop="16dp"
+        android:layout_width="203dp"
+        android:layout_height="54dp"
+        android:layout_marginTop="12dp"
         android:text="下一步"
         android:textSize="20dp"
         android:visibility="invisible"
         app:layout_constraintDimensionRatio="1:1"
         app:layout_constraintEnd_toStartOf="@+id/guideline6"
+        app:layout_constraintHorizontal_bias="0.333"
         app:layout_constraintStart_toStartOf="@+id/guideline5"
         app:layout_constraintTop_toTopOf="@+id/guideline8" />
 
     <Button
         android:id="@+id/btnPickPhoto"
-        android:layout_width="200dp"
-        android:layout_height="75dp"
+        android:layout_width="208dp"
+        android:layout_height="67dp"
         android:text="選取照片"
         android:textSize="20dp"
+        app:layout_constraintBottom_toBottomOf="@id/guideline10"
         app:layout_constraintDimensionRatio="1:1"
-        app:layout_constraintStart_toStartOf="@id/guideline5"
         app:layout_constraintEnd_toEndOf="@id/guideline6"
-        app:layout_constraintTop_toTopOf="@id/guideline9"
-        app:layout_constraintBottom_toBottomOf="@id/guideline10"/>
+        app:layout_constraintStart_toStartOf="@id/guideline5"
+        app:layout_constraintTop_toTopOf="@id/guideline9" />
 
 
     <androidx.constraintlayout.widget.Guideline
