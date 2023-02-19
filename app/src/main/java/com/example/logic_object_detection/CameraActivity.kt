@@ -37,7 +37,7 @@ import java.lang.Math.abs
 
 
 class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
-    lateinit var sceneView: ArSceneView
+    private lateinit var sceneView: ArSceneView
     private var isBackPressed:Boolean=false
     private var nodeList:ArrayList <Node> = arrayListOf()
     override fun onCreate(savedInstanceState: Bundle?) {

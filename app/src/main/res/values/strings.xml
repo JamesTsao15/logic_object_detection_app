@@ -2,4 +2,8 @@
     <string name="app_name">logic_object_detection</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="directions">註：and運算輸入and 各種運算依此類推\n
+        運算規則：\n
+        1.()優先運算\n
+        2.變數與運算符中間需要予以空格</string>
 </resources>

@@ -62,7 +62,6 @@ class MainActivity : AppCompatActivity() {
                     BitmapFactory.decodeStream(inputStream,null,options)
                     activityMainBinding.imgViewShowPhoto.setImageURI(it)
                     activityMainBinding.btnNextStep.visibility= View.VISIBLE
-                    Log.e("JAMES","inLoop")
                 }catch (e:FileNotFoundException){
                     e.stackTrace
                     Toast.makeText(this,"找不到此檔案",Toast.LENGTH_SHORT).show()
@@ -81,7 +80,6 @@ class MainActivity : AppCompatActivity() {
             }
 
         })
-
     }
     fun maybeEnableArButton() {
         val availability = ArCoreApk.getInstance().checkAvailability(this)

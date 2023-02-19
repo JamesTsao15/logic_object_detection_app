@@ -3,7 +3,9 @@ package com.example.logic_object_detection
 
 import android.annotation.SuppressLint
 import android.app.ProgressDialog
+import android.content.Intent
 import android.graphics.*
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -11,10 +13,13 @@ import android.os.Handler
 import android.os.Message
 import android.provider.MediaStore
 import android.util.Log
+import android.view.ViewTreeObserver
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
+import androidx.core.widget.addTextChangedListener
 import com.example.logic_object_detection.databinding.ActivityDetectLogicPictureBinding
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import org.opencv.android.BaseLoaderCallback
@@ -65,6 +70,12 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         override fun handleMessage(msg: Message) {
             when(msg.what){
                 0->{
+                    binding.apply {
+                        buttonDetectPicVar.isVisible=false
+                        buttonMakeTable.isVisible=false
+                        editTextFormula.isVisible=false
+                        textViewDirections.isVisible=false
+                    }
                     Log.e("JAMES","in message 0")
                     progressDialog= ProgressDialog(this@detect_logic_picture_Activity).apply {
                         setMessage("轉化電路中......")
@@ -75,9 +86,14 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                 1->{
                     Log.e("JAMES","in message 1")
                     binding.imageViewLineDetect.setImageBitmap(detectionBitmap)
-                    //binding.imageViewLineDetect.setImageBitmap(testBitmap)
                     try {
                         progressDialog.dismiss()
+                        binding.apply {
+                            buttonDetectPicVar.isVisible=true
+                            buttonMakeTable.isVisible=true
+                            editTextFormula.isVisible=true
+                            textViewDirections.isVisible=true
+                        }
                     }catch (e:UninitializedPropertyAccessException){
                         e.printStackTrace()
                     }
@@ -128,9 +144,6 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                detectBitmap = MediaStore.Images.Media.getBitmap(contentResolver, pictrueUri)
                detectBitmap=resizeBitmapSize(detectBitmap,700,400)
                 thread_detect_Circuit= Thread(Runnable {
-                        runOnUiThread{
-                            binding.imageViewDetectPicture.setImageBitmap(detectBitmap)
-                        }
                         if(OpenCVLoader.initDebug()) {
                             Log.e("JAMES", "Opencv initialization is done")
                             myLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS)
@@ -160,9 +173,6 @@ class detect_logic_picture_Activity : AppCompatActivity() {
                 thread_detect_Circuit= Thread(Runnable {
                     detectBitmap = ImageDecoder.decodeBitmap(source)
                     detectBitmap=resizeBitmapSize(detectBitmap,700,400)
-                    runOnUiThread{
-                        binding.imageViewDetectPicture.setImageBitmap(detectBitmap)
-                    }
                     if(OpenCVLoader.initDebug()) {
                         Log.e("JAMES", "Opencv initialization is done")
                         myLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS)
@@ -200,6 +210,26 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         binding.buttonDetectPicVar.setOnClickListener {
             showDetectPictureView()
         }
+        binding.buttonMakeTable.setOnClickListener {
+            val formula=binding.editTextFormula.text.toString()
+            val intent=Intent(this,TruthTableActivity::class.java)
+            intent.putExtra("formula",formula)
+            startActivity(intent)
+        }
+        binding.editTextFormula.addTextChangedListener {
+            s->
+            val regex = Regex("[\u4e00-\u9fa5]")
+            if(regex.containsMatchIn(s.toString())
+                || s.toString().contains("（")
+                || s.toString().contains("）")){
+                binding.editTextFormula.error="輸入的算式不得包含全形括號或是中文"
+                binding.buttonMakeTable.isEnabled=false
+            }
+            else{
+                binding.editTextFormula.error=null
+                binding.buttonMakeTable.isEnabled=true
+            }
+        }
     }
     private fun showDetectPictureView(){
         val dialog=BottomSheetDialog(this)
@@ -217,9 +247,6 @@ class detect_logic_picture_Activity : AppCompatActivity() {
         tv_progressDistance!!.text="$min_distance_to_merge"
         tv_progressNodeArea!!.text="$nodeArea"
         val newThread:Thread= Thread(Runnable {
-            runOnUiThread{
-                binding.imageViewDetectPicture.setImageBitmap(detectBitmap)
-            }
             if(OpenCVLoader.initDebug()) {
                 Log.e("JAMES", "Opencv initialization is done")
                 testBitmap=detectBitmap.copy(Bitmap.Config.ARGB_8888,true)

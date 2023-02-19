@@ -21,7 +21,7 @@
     <Button
         android:id="@+id/btnTakePhoto"
         android:layout_width="200dp"
-        android:layout_height="75dp"
+        android:layout_height="78dp"
         android:text="擴增實境\n智慧相機"
         android:textSize="20dp"
         app:layout_constraintBottom_toBottomOf="@id/guideline8"
